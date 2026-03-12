@@ -1,0 +1,27 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cauterize"
+version = "0.1.0"
+description = "Python self-healing module — intercepts runtime errors, uses AI to generate patches, applies them without restart"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+dependencies = [
+    "anthropic>=0.40.0",
+    "requests>=2.31.0",
+]
+
+[project.optional-dependencies]
+fastapi = ["fastapi>=0.100.0"]
+django = ["django>=4.2"]
+celery = ["celery>=5.3"]
+all = ["fastapi>=0.100.0", "django>=4.2", "celery>=5.3"]
+
+[project.entry-points."cauterize.integrations"]
+# third-party packages register here; built-ins are auto-discovered
+
+[tool.hatch.build.targets.wheel]
+packages = ["cauterize"]
