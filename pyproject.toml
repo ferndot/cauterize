@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "cauterize"
 version = "0.1.0"
-description = "Python self-healing module — intercepts runtime errors, uses AI to generate patches, applies them without restart"
+description = "Stop the bleed. Cauterize hot patches runtime wounds."
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
@@ -18,7 +18,8 @@ dependencies = [
 fastapi = ["fastapi>=0.100.0"]
 django = ["django>=4.2"]
 celery = ["celery>=5.3"]
-all = ["fastapi>=0.100.0", "django>=4.2", "celery>=5.3"]
+agent = ["claude-agent-sdk>=0.1.0"]
+all = ["fastapi>=0.100.0", "django>=4.2", "celery>=5.3", "claude-agent-sdk>=0.1.0"]
 
 [project.entry-points."cauterize.integrations"]
 # third-party packages register here; built-ins are auto-discovered

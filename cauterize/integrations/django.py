@@ -62,11 +62,11 @@ def _patch_url_registration(urls_module: Any, mode: str) -> None:
             continue
 
         def _make_patched(orig):  # noqa: ANN001
-            def _patched(route, view, **kwargs):  # type: ignore[no-untyped-def]
+            def _patched(route, view, *args, **kwargs):  # type: ignore[no-untyped-def]
                 from .. import _config
                 current_mode = _config.get().mode
                 view = _maybe_wrap(view, current_mode)
-                return orig(route, view, **kwargs)
+                return orig(route, view, *args, **kwargs)
             _patched._cauterize_patched = True  # type: ignore[attr-defined]
             return _patched
 

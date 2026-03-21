@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 import requests
 
 if TYPE_CHECKING:
-    from ._context import HealContext
+    from .._context import HealContext
 
 
 @dataclass

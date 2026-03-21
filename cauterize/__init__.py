@@ -40,9 +40,9 @@ from typing import Any, Callable
 from ._config import configure, get as get_config
 from ._heal import heal as _heal_decorator
 from ._hook import install_hook
-from ._notify import SlackNotifier
-from ._jira import JiraCard
 from ._registry import get_registry
+from .integrations.slack import SlackNotifier
+from .integrations.jira import JiraCard
 
 
 __version__ = "0.1.0"
@@ -51,6 +51,7 @@ __all__ = [
     "configure",
     "heal",
     "exclude",
+    "protect",
     "SlackNotifier",
     "JiraCard",
     "__version__",
@@ -102,6 +103,9 @@ def heal(func: Callable) -> Callable:
     """
     wrapped = _heal_decorator(func)
     wrapped._cauterize_heal = True  # type: ignore[attr-defined]
+    # propagate so callers can check the outer wrapper
+    if getattr(func, '__cauterize_protected__', False):
+        wrapped.__cauterize_protected__ = True  # type: ignore[attr-defined]
     return wrapped
 
 
@@ -117,3 +121,23 @@ def exclude(func: Callable) -> Callable:
     """
     func._cauterize_exclude = True  # type: ignore[attr-defined]
     return func
+
+
+def protect(func: Callable) -> Callable:
+    """
+    Decorator: mark a function as containing high-risk logic (financial ops,
+    bulk mutations, etc.) that should never be auto-patched.
+
+    Cauterize will detect exceptions but refuse to heal and re-raise immediately.
+
+    Usage::
+
+        @cauterize.protect
+        def process_payment(order_id: int) -> dict:
+            ...
+    """
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        return func(*args, **kwargs)
+    wrapper.__cauterize_protected__ = True  # type: ignore[attr-defined]
+    return wrapper

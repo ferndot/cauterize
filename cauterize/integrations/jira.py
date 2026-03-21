@@ -5,10 +5,10 @@ from typing import TYPE_CHECKING
 
 import requests
 
-from . import _audit
+from .. import _audit
 
 if TYPE_CHECKING:
-    from ._context import HealContext
+    from .._context import HealContext
 
 
 @dataclass

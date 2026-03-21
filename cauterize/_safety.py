@@ -30,6 +30,10 @@ _PROTECTED_MODULES = frozenset({
 
 
 def is_eligible(func: Any, exc: BaseException) -> bool:
+    # never heal explicitly protected functions
+    if getattr(func, '__cauterize_protected__', False):
+        return False
+
     if type(exc).__name__ in _INELIGIBLE_EXC_TYPES:
         return False
 
