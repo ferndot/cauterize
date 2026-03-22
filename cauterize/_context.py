@@ -35,6 +35,8 @@ class HealContext:
     fixed_source: str
     explanation: str
     confidence: float
+    source_file: str = ""         # absolute path to the source file
+    original_source: str = ""     # the original (broken) function source
     timestamp: str = field(
         default_factory=lambda: time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     )
