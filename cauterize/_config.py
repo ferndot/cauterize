@@ -25,9 +25,11 @@ _config = Config()
 
 def configure(**kwargs: Any) -> None:
     global _config
-    unknown = set(kwargs) - {f.name for f in _config.__dataclass_fields__.values()}
+    unknown = set(kwargs) - set(_config.__dataclass_fields__)
     if unknown:
         raise ValueError(f"Unknown config keys: {unknown}")
+    if "mode" in kwargs:
+        set_mode(kwargs.pop("mode"))
     for k, v in kwargs.items():
         setattr(_config, k, v)
 

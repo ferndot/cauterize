@@ -21,8 +21,6 @@ def heal(func: Callable) -> Callable:
     if getattr(func, "__cauterize_healed__", False):
         return func
 
-    func.__cauterize_heal__ = True
-
     _healed = [None]
 
     if asyncio.iscoroutinefunction(func):
@@ -32,7 +30,14 @@ def heal(func: Callable) -> Callable:
                 log.info("cauterize: [cache] serving healed %s — patch already applied, no LLM call", func.__qualname__)
                 return await _healed[0](*args, **kwargs)
             return await _run_async(func, args, kwargs, _healed)
+
+        def _async_reset():
+            _healed[0] = None
+
         async_wrapper.__cauterize_healed__ = True
+        async_wrapper.__cauterize_reset__ = _async_reset
+        if getattr(func, '__cauterize_protected__', False):
+            async_wrapper.__cauterize_protected__ = True  # type: ignore[attr-defined]
         return async_wrapper
     else:
         @functools.wraps(func)
@@ -44,8 +49,16 @@ def heal(func: Callable) -> Callable:
             if _healed[0] is not None:
                 sync_wrapper.__cauterize_healed_fn__ = _healed[0]
             return result
+
+        def _sync_reset():
+            _healed[0] = None
+            if hasattr(sync_wrapper, '__cauterize_healed_fn__'):
+                del sync_wrapper.__cauterize_healed_fn__
+
         sync_wrapper.__cauterize_healed__ = True
-        sync_wrapper.__cauterize_reset__ = lambda: (_healed.__setitem__(0, None), delattr(sync_wrapper, '__cauterize_healed_fn__') if hasattr(sync_wrapper, '__cauterize_healed_fn__') else None)
+        sync_wrapper.__cauterize_reset__ = _sync_reset
+        if getattr(func, '__cauterize_protected__', False):
+            sync_wrapper.__cauterize_protected__ = True  # type: ignore[attr-defined]
         return sync_wrapper
 
 

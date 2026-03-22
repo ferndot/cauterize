@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import functools
-import inspect
 from typing import Any
 
 
@@ -20,10 +19,11 @@ class StartupWrapper:
 
     def __init__(self, func: Any) -> None:
         self._func = func
+        self._is_async = asyncio.iscoroutinefunction(func)
         functools.update_wrapper(self, func)
 
     def __call__(self):
-        if inspect.iscoroutinefunction(self._func):
+        if self._is_async:
             return self._run_async()
         return self._run_sync()
 

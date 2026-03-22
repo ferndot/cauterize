@@ -55,12 +55,13 @@ def _walk_frames(tb: TracebackType | None) -> list[FrameInfo]:
     frames = []
     while tb is not None:
         frame = tb.tb_frame
+        is_last = tb.tb_next is None
         frames.append(FrameInfo(
             filename=frame.f_code.co_filename,
             lineno=tb.tb_lineno,
             func_name=frame.f_code.co_name,
-            source=_get_source(frame),
-            locals=_extract_locals(frame.f_locals),
+            source=_get_source(frame) if is_last else None,
+            locals=_extract_locals(frame.f_locals) if is_last else {},
         ))
         tb = tb.tb_next
     return frames

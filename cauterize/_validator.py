@@ -5,10 +5,6 @@ import textwrap
 from typing import Any
 
 
-_DANGEROUS_NODES = frozenset({
-    "eval", "exec", "compile", "__import__",
-})
-
 # attribute access patterns we reject: os.system, subprocess.*, socket.*, open
 _DANGEROUS_ATTRS = frozenset({
     "system", "popen", "execv", "execve",   # os
@@ -31,29 +27,22 @@ def validate(original_source: str, fixed_source: str, original_func: Any) -> str
     except SyntaxError as e:
         return f"SyntaxError in patch: {e}"
 
-    # 2. signature must not change
     try:
         orig_tree = ast.parse(textwrap.dedent(original_source))
+    except SyntaxError:
+        orig_tree = None
+
+    if orig_tree is not None:
         sig_err = _check_signatures(orig_tree, fixed_tree)
         if sig_err:
             return sig_err
-    except SyntaxError:
-        pass    # original may not parse cleanly in isolation — skip check
-
-    # 3. no new imports
-    try:
-        orig_tree = ast.parse(textwrap.dedent(original_source))
         if _has_new_imports(orig_tree, fixed_tree):
             return "Patch adds new imports"
-    except SyntaxError:
-        pass
 
-    # 4. dangerous pattern check
     danger = _find_dangerous_patterns(fixed_tree)
     if danger:
         return f"Dangerous patterns detected: {', '.join(danger)}"
 
-    # 5. line count sanity — no more than 3× the original
     orig_lines = _count_code_lines(original_source)
     fixed_lines = _count_code_lines(fixed_source)
     if orig_lines > 0 and fixed_lines > orig_lines * 3:

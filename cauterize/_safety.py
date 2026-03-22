@@ -42,7 +42,7 @@ def is_eligible(func: Any, exc: BaseException) -> bool:
         return False
 
     try:
-        inspect.getsource(func)
+        inspect.getfile(func)
     except (OSError, TypeError):
         return False    # no source available — C extension or built-in
 

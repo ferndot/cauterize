@@ -16,7 +16,7 @@ import threading
 from pathlib import Path
 from typing import Any
 
-from . import _audit, _config, _patcher, _validator
+from . import _audit, _config, _patcher, _prompt, _validator
 from ._context import ExceptionContext, get_source
 
 log = logging.getLogger("cauterize.escalation")
@@ -116,15 +116,7 @@ async def _agentic_fix(func: Any, ctx: ExceptionContext) -> None:
 
 
 def _build_prompt(func: Any, source: str, ctx: ExceptionContext, module_file: str) -> str:
-    traceback_lines = []
-    for frame in ctx.frames:
-        traceback_lines.append(f'  File "{frame.filename}", line {frame.lineno}, in {frame.func_name}')
-        if frame.source:
-            # Show the specific failing line only
-            lines = frame.source.splitlines()
-            if 0 < frame.lineno <= len(lines):
-                traceback_lines.append(f"    {lines[frame.lineno - 1].strip()}")
-    traceback_str = "\n".join(traceback_lines)
+    traceback_str = _prompt._format_traceback(ctx)
 
     return (
         f"Fix the following Python function. "
