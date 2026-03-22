@@ -18,13 +18,9 @@ Quick start (manual mode — opt-in per function):
 Configuration:
 
     cauterize.configure(
+        api_key="sk-ant-...",           # defaults to ANTHROPIC_API_KEY env var
         confidence_threshold=0.85,
         max_retries=3,
-        # Provider is auto-detected from ANTHROPIC_API_KEY / OPENAI_API_KEY.
-        # Override explicitly:
-        provider=cauterize.AnthropicProvider(model="claude-opus-4-6"),
-        # or:
-        provider=cauterize.OpenAIProvider(model="gpt-4o"),
         slack=cauterize.SlackNotifier(webhook_url="https://hooks.slack.com/..."),
         jira=cauterize.JiraCard(
             base_url="https://myorg.atlassian.net",
@@ -47,8 +43,6 @@ from ._hook import install_hook
 from ._registry import get_registry
 from .integrations.slack import SlackNotifier
 from .integrations.jira import JiraCard
-from .providers.anthropic import AnthropicProvider
-from .providers.openai import OpenAIProvider
 
 
 __version__ = "0.1.0"
@@ -60,8 +54,6 @@ __all__ = [
     "protect",
     "SlackNotifier",
     "JiraCard",
-    "AnthropicProvider",
-    "OpenAIProvider",
     "__version__",
 ]
 
