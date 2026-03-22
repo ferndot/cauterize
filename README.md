@@ -1,18 +1,26 @@
 # cauterize
 
-**Self-healing Python.** When a runtime exception occurs in a decorated function, cauterize intercepts it, asks Claude to generate a fix, validates and replays it, then hot-patches the live process — no restart required.
+**Self-healing Python.** When a runtime exception occurs in a decorated function, cauterize intercepts it, asks an LLM to generate a fix, validates and replays it, then hot-patches the live process — no restart required.
 
 ## Install
 
 ```bash
-pip install cauterize
-# With framework extras:
-pip install "cauterize[fastapi]"
-pip install "cauterize[django]"
-pip install "cauterize[celery]"
+# Anthropic / Claude
+pip install "cauterize[anthropic]"
+
+# OpenAI
+pip install "cauterize[openai]"
+
+# Framework extras
+pip install "cauterize[anthropic,fastapi]"
+pip install "cauterize[anthropic,django]"
+pip install "cauterize[anthropic,celery]"
+
+# Everything
+pip install "cauterize[all]"
 ```
 
-Requires `ANTHROPIC_API_KEY` in the environment (or pass `api_key=` to `configure()`).
+Set `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` in the environment — cauterize auto-detects the provider, or you can pass one explicitly via `configure()`.
 
 ---
 
@@ -44,12 +52,12 @@ def index():
     return {"ok": True}
 ```
 
-Opt individual functions out with `@cauterize.exclude`:
+Opt individual functions out with `@cauterize.protect`:
 
 ```python
-@cauterize.exclude
-@app.get("/webhook")
-def stripe_webhook(request: Request):
+@cauterize.protect          # never auto-patched — exception propagates normally
+@app.post("/refund")
+def process_refund(request: Request):
     ...
 ```
 
@@ -70,12 +78,12 @@ def risky_calculation(x: int) -> int:
 ## How it works
 
 1. **Intercept** — `@cauterize.heal` wraps the function in a try/except retry loop (sync and async).
-2. **Check eligibility** — builtins, C extensions, magic methods, and `cauterize.*` itself are never patched.
+2. **Check eligibility** — builtins, C extensions, magic methods, protected functions, and `cauterize.*` itself are never patched.
 3. **Rate-limit** — each `(function, exc_type)` pair gets at most `max_retries` attempts per hour.
-4. **Ask Claude** — the function source, traceback, and local variable types (not values) are sent to Claude with a structured tool-use prompt. Claude returns `fixed_source`, `explanation`, and `confidence`.
+4. **Ask the LLM** — the function source, traceback, and local variable types (not values) are sent with a structured prompt. The LLM returns `fixed_source`, `explanation`, `confidence`, and `is_safe_to_auto_apply`.
 5. **Validate** — the patch is AST-checked: must compile, signature unchanged, no new imports, no dangerous builtins, line count ≤ 3× original.
 6. **Replay** — the fixed function is executed with the original arguments. If it raises, the patch is discarded.
-7. **Commit** — `setattr(module, func_name, new_func)` hot-patches the live module.
+7. **Commit** — `setattr(module, func_name, new_func)` hot-patches the live module. The fix is cached — subsequent calls use the patched version with zero LLM overhead.
 8. **Notify** — Slack message + Jira card are created in a background thread.
 
 ---
@@ -84,8 +92,10 @@ def risky_calculation(x: int) -> int:
 
 ```python
 cauterize.configure(
-    api_key="sk-ant-...",           # default: ANTHROPIC_API_KEY env var
-    model="claude-opus-4-6",        # Claude model for patch generation
+    # Provider (auto-detected from env if omitted)
+    provider=cauterize.AnthropicProvider(model="claude-opus-4-6", api_key="sk-ant-..."),
+    # provider=cauterize.OpenAIProvider(model="gpt-4o", api_key="sk-..."),
+
     confidence_threshold=0.85,      # minimum confidence to apply a patch (0–1)
     max_retries=3,                  # max heal attempts per function/exc_type per hour
     dry_run=False,                  # if True: generate and log patches but don't apply
@@ -97,6 +107,25 @@ cauterize.configure(
         auth=("user@example.com", "api_token"),
     ),
 )
+```
+
+### Supported providers
+
+| Provider | Extra | Environment variable |
+|----------|-------|---------------------|
+| Anthropic (Claude) | `cauterize[anthropic]` | `ANTHROPIC_API_KEY` |
+| OpenAI | `cauterize[openai]` | `OPENAI_API_KEY` |
+
+Custom providers implement the `cauterize.Provider` ABC:
+
+```python
+from cauterize import Provider, AIResponse
+
+class MyProvider(Provider):
+    def request_fix(self, func, exc, prompt: str) -> AIResponse | None:
+        ...
+
+cauterize.configure(provider=MyProvider())
 ```
 
 ---
@@ -126,7 +155,7 @@ Implement the `Integration` protocol from `cauterize.integrations._base`.
 
 | Mode | Behaviour |
 |------|-----------|
-| `"auto"` | All framework routes and tasks are wrapped; `@cauterize.exclude` opts out |
+| `"auto"` | All framework routes and tasks are wrapped; `@cauterize.protect` opts out |
 | `"manual"` | Nothing is wrapped automatically; `@cauterize.heal` opts in |
 
 ---
@@ -148,5 +177,6 @@ Statuses: `healed`, `rejected` (low confidence), `failed` (validation/replay err
 - Dangerous builtins (`eval`, `exec`, `open`, `__import__`) and shell calls (`os.system`, `subprocess.*`) are rejected by the AST validator.
 - Patches that change a function's signature or add new imports are rejected.
 - Patches that fail the pre-commit replay with the original arguments are discarded.
+- `@cauterize.protect` marks a function as never auto-patchable — the exception propagates as normal.
 - `cauterize.*` modules are in `_PROTECTED_MODULES` and will never self-patch.
 - Healing is skipped for `KeyboardInterrupt`, `SystemExit`, I/O errors, and other non-recoverable exception types.
