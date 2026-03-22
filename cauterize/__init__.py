@@ -37,7 +37,7 @@ from __future__ import annotations
 import functools
 from typing import Any, Callable
 
-from ._config import configure, get as get_config
+from ._config import configure
 from ._heal import heal as _heal_decorator
 from ._hook import install_hook
 from ._registry import get_registry
@@ -78,7 +78,8 @@ def install(mode: str = "auto") -> None:
 
     # Patch any framework modules that are already in sys.modules
     import sys
-    for module_name, module in list(sys.modules.items()):
+    for module_name in list(registry._target_map):
+        module = sys.modules.get(module_name)
         if module is None:
             continue
         for integration in registry.integrations_for(module_name):
@@ -103,9 +104,6 @@ def heal(func: Callable) -> Callable:
     """
     wrapped = _heal_decorator(func)
     wrapped._cauterize_heal = True  # type: ignore[attr-defined]
-    # propagate so callers can check the outer wrapper
-    if getattr(func, '__cauterize_protected__', False):
-        wrapped.__cauterize_protected__ = True  # type: ignore[attr-defined]
     return wrapped
 
 
