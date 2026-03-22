@@ -63,3 +63,7 @@ all = [
 
 [project.entry-points."cauterize.integrations"]
 # third-party packages register here; built-ins are auto-discovered
+
+[tool.uv.build-backend]
+module-name = "cauterize"
+module-root = ""
