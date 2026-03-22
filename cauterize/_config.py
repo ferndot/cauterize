@@ -12,7 +12,7 @@ if TYPE_CHECKING:
 class Config:
     confidence_threshold: float = 0.85
     max_retries: int = 3
-    model: str = "anthropic:claude-opus-4-6"
+    model: str = "claude-opus-4-6"
     dry_run: bool = False
     mode: str = "auto"          # "auto" | "manual"
     audit_path: str | None = None

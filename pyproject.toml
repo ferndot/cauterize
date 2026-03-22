@@ -36,9 +36,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    # pydantic-ai provides provider-agnostic model calls;
-    # users install provider extras themselves, e.g. pydantic-ai[anthropic] or pydantic-ai[openai]
-    "pydantic-ai>=0.0.14",
+    "anthropic>=0.40.0",
     "requests>=2.31.0",
 ]
 
