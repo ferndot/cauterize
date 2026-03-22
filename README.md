@@ -1,26 +1,19 @@
 # cauterize
 
-**Self-healing Python.** When a runtime exception occurs in a decorated function, cauterize intercepts it, asks an LLM to generate a fix, validates and replays it, then hot-patches the live process — no restart required.
+**Self-healing Python.** When a runtime exception occurs in a decorated function, cauterize intercepts it, asks Claude to generate a fix, validates and replays it, then hot-patches the live process — no restart required.
 
 ## Install
 
 ```bash
-# Anthropic / Claude
-pip install "cauterize[anthropic]"
+pip install cauterize
 
-# OpenAI
-pip install "cauterize[openai]"
-
-# Framework extras
-pip install "cauterize[anthropic,fastapi]"
-pip install "cauterize[anthropic,django]"
-pip install "cauterize[anthropic,celery]"
-
-# Everything
-pip install "cauterize[all]"
+# With framework extras:
+pip install "cauterize[fastapi]"
+pip install "cauterize[django]"
+pip install "cauterize[celery]"
 ```
 
-Set `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` in the environment — cauterize auto-detects the provider, or you can pass one explicitly via `configure()`.
+Requires `ANTHROPIC_API_KEY` in the environment.
 
 ---
 
@@ -80,10 +73,10 @@ def risky_calculation(x: int) -> int:
 1. **Intercept** — `@cauterize.heal` wraps the function in a try/except retry loop (sync and async).
 2. **Check eligibility** — builtins, C extensions, magic methods, protected functions, and `cauterize.*` itself are never patched.
 3. **Rate-limit** — each `(function, exc_type)` pair gets at most `max_retries` attempts per hour.
-4. **Ask the LLM** — the function source, traceback, and local variable types (not values) are sent with a structured prompt. The LLM returns `fixed_source`, `explanation`, `confidence`, and `is_safe_to_auto_apply`.
+4. **Ask Claude** — the function source, traceback, and local variable types (not values) are sent with a structured tool-use prompt. Claude returns `fixed_source`, `explanation`, `confidence`, and `is_safe_to_auto_apply`.
 5. **Validate** — the patch is AST-checked: must compile, signature unchanged, no new imports, no dangerous builtins, line count ≤ 3× original.
 6. **Replay** — the fixed function is executed with the original arguments. If it raises, the patch is discarded.
-7. **Commit** — `setattr(module, func_name, new_func)` hot-patches the live module. The fix is cached — subsequent calls use the patched version with zero LLM overhead.
+7. **Commit** — `setattr(module, func_name, new_func)` hot-patches the live module. The fix is cached — subsequent calls skip the LLM entirely.
 8. **Notify** — Slack message + Jira card are created in a background thread.
 
 ---
@@ -92,14 +85,11 @@ def risky_calculation(x: int) -> int:
 
 ```python
 cauterize.configure(
-    # Provider (auto-detected from env if omitted)
-    provider=cauterize.AnthropicProvider(model="claude-opus-4-6", api_key="sk-ant-..."),
-    # provider=cauterize.OpenAIProvider(model="gpt-4o", api_key="sk-..."),
-
+    model="claude-opus-4-6",        # Claude model for patch generation
     confidence_threshold=0.85,      # minimum confidence to apply a patch (0–1)
     max_retries=3,                  # max heal attempts per function/exc_type per hour
     dry_run=False,                  # if True: generate and log patches but don't apply
-    audit_path="/var/log/cauterize.jsonl",   # JSON Lines audit log
+    audit_path="/var/log/cauterize.jsonl",
     slack=cauterize.SlackNotifier(webhook_url="..."),
     jira=cauterize.JiraCard(
         base_url="https://myorg.atlassian.net",
@@ -107,25 +97,6 @@ cauterize.configure(
         auth=("user@example.com", "api_token"),
     ),
 )
-```
-
-### Supported providers
-
-| Provider | Extra | Environment variable |
-|----------|-------|---------------------|
-| Anthropic (Claude) | `cauterize[anthropic]` | `ANTHROPIC_API_KEY` |
-| OpenAI | `cauterize[openai]` | `OPENAI_API_KEY` |
-
-Custom providers implement the `cauterize.Provider` ABC:
-
-```python
-from cauterize import Provider, AIResponse
-
-class MyProvider(Provider):
-    def request_fix(self, func, exc, prompt: str) -> AIResponse | None:
-        ...
-
-cauterize.configure(provider=MyProvider())
 ```
 
 ---
