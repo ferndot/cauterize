@@ -1,6 +1,6 @@
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["uv_build>=0.1"]
+build-backend = "uv_build"
 
 [project]
 name = "cauterize"
@@ -8,21 +8,58 @@ version = "0.1.0"
 description = "Stop the bleed. Cauterize hot patches runtime wounds."
 readme = "README.md"
 requires-python = ">=3.11"
-license = {text = "MIT"}
+license = {file = "LICENSE.md"}
+authors = [
+    {name = "Fern Dot", email = "contact@ferns.land"},
+]
+keywords = [
+    "self-healing",
+    "hot-patching",
+    "fault-tolerance",
+    "llm",
+    "anthropic",
+    "openai",
+    "claude",
+    "agentic",
+    "debugging",
+    "runtime",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: Other/Proprietary License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Debuggers",
+    "Typing :: Typed",
+]
 dependencies = [
-    "anthropic>=0.40.0",
     "requests>=2.31.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/ferndot/cauterize"
+Repository = "https://github.com/ferndot/cauterize"
+Issues = "https://github.com/ferndot/cauterize/issues"
+
 [project.optional-dependencies]
+anthropic = ["anthropic>=0.40.0"]
+openai = ["openai>=1.0.0"]
 fastapi = ["fastapi>=0.100.0"]
 django = ["django>=4.2"]
 celery = ["celery>=5.3"]
 agent = ["claude-agent-sdk>=0.1.0"]
-all = ["fastapi>=0.100.0", "django>=4.2", "celery>=5.3", "claude-agent-sdk>=0.1.0"]
+all = [
+    "anthropic>=0.40.0",
+    "openai>=1.0.0",
+    "fastapi>=0.100.0",
+    "django>=4.2",
+    "celery>=5.3",
+    "claude-agent-sdk>=0.1.0",
+]
 
 [project.entry-points."cauterize.integrations"]
 # third-party packages register here; built-ins are auto-discovered
-
-[tool.hatch.build.targets.wheel]
-packages = ["cauterize"]
