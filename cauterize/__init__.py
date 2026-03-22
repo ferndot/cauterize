@@ -38,11 +38,12 @@ import functools
 from typing import Any, Callable
 
 from ._config import configure
-from ._heal import heal as _heal_decorator
+from ._heal import heal as _heal_decorator, get_notification_results
 from ._hook import install_hook
 from ._registry import get_registry
 from .integrations.slack import SlackNotifier
 from .integrations.jira import JiraCard
+from .integrations.github import GitHubPR
 
 
 __version__ = "0.1.0"
@@ -54,6 +55,8 @@ __all__ = [
     "protect",
     "SlackNotifier",
     "JiraCard",
+    "GitHubPR",
+    "get_notification_results",
     "__version__",
 ]
 

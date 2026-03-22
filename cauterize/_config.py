@@ -18,6 +18,7 @@ class Config:
     audit_path: str | None = None
     slack: Any = None           # SlackNotifier
     jira: Any = None            # JiraCard
+    github: Any = None          # GitHubPR
 
 
 _config = Config()

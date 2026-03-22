@@ -11,6 +11,12 @@ from ._context import HealContext
 
 log = logging.getLogger("cauterize")
 
+_notification_results: dict[str, dict] = {}  # func_qualname -> notification results
+
+
+def get_notification_results(func_qualname: str) -> dict | None:
+    return _notification_results.get(func_qualname)
+
 
 def heal(func: Callable) -> Callable:
     """
@@ -255,7 +261,12 @@ async def _run_async(func: Any, args: tuple, kwargs: dict, _healed: list) -> Any
 # ── post-heal dispatch ─────────────────────────────────────────────────────────
 
 def _dispatch_notifications(ctx: _context.ExceptionContext, ai_resp: Any) -> None:
+    import inspect
     func_qualname = getattr(ctx.target_func, "__qualname__", "<unknown>")
+    try:
+        source_file = inspect.getfile(ctx.target_func)
+    except (OSError, TypeError):
+        source_file = ""
     heal_ctx = HealContext(
         func_qualname=func_qualname,
         exc_type=ctx.exc_type,
@@ -263,6 +274,8 @@ def _dispatch_notifications(ctx: _context.ExceptionContext, ai_resp: Any) -> Non
         fixed_source=ai_resp.fixed_source,
         explanation=ai_resp.explanation,
         confidence=ai_resp.confidence,
+        source_file=source_file,
+        original_source=_context.get_source(ctx.target_func),
     )
     threading.Thread(
         target=_post_heal_dispatch,
@@ -274,13 +287,29 @@ def _dispatch_notifications(ctx: _context.ExceptionContext, ai_resp: Any) -> Non
 def _post_heal_dispatch(heal_ctx: HealContext) -> None:
     from . import _config as cfg_mod
     cfg = cfg_mod.get()
+    results: dict = {}
 
     card_url = None
     if cfg.jira:
-        card_url = cfg.jira.create(heal_ctx)
+        try:
+            card_url = cfg.jira.create(heal_ctx)
+            results["jira_url"] = card_url
+        except Exception:
+            pass
 
     if cfg.slack:
         try:
             cfg.slack.send(heal_ctx, card_url)
+            results["slack_sent"] = True
         except Exception:
             pass
+
+    if cfg.github:
+        try:
+            pr_url = cfg.github.create(heal_ctx)
+            if pr_url:
+                results["github_pr_url"] = pr_url
+        except Exception:
+            pass
+
+    _notification_results[heal_ctx.func_qualname] = results
