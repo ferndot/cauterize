@@ -16,17 +16,21 @@ class JiraCard:
     url: str
     token: str
     project: str
+    email: str = ""          # Atlassian Cloud: email + token -> Basic auth
     issue_type: str = "Task"
 
     def create(self, ctx: HealContext) -> str | None:
         """Create a Jira card. Returns the card URL, or None on failure."""
+        # Atlassian Cloud uses Basic auth (email:api_token); self-hosted uses Bearer.
+        auth = (self.email, self.token) if self.email else None
+        headers: dict[str, str] = {"Content-Type": "application/json"}
+        if not self.email:
+            headers["Authorization"] = f"Bearer {self.token}"
         try:
             resp = requests.post(
                 f"{self.url}/rest/api/3/issue",
-                headers={
-                    "Authorization": f"Bearer {self.token}",
-                    "Content-Type": "application/json",
-                },
+                headers=headers,
+                auth=auth,
                 json={
                     "fields": {
                         "project":   {"key": self.project},
