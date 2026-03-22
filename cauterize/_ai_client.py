@@ -1,36 +1,21 @@
 from __future__ import annotations
 
-import time
-from dataclasses import dataclass
 from typing import Any
 
-import anthropic
+from pydantic import BaseModel
+from pydantic_ai import Agent
 
 from . import _config
 from ._context import get_source
 
 
-@dataclass
-class AIResponse:
+class AIResponse(BaseModel):
     fixed_source: str
     confidence: float
     explanation: str
     is_safe_to_auto_apply: bool
     safety_concerns: str
 
-
-_RESPONSE_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "fixed_source":          {"type": "string"},
-        "confidence":            {"type": "number"},
-        "explanation":           {"type": "string"},
-        "is_safe_to_auto_apply": {"type": "boolean"},
-        "safety_concerns":       {"type": "string"},
-    },
-    "required": ["fixed_source", "confidence", "explanation",
-                 "is_safe_to_auto_apply", "safety_concerns"],
-}
 
 # Confidence discount factors by exception type
 _EXC_DISCOUNTS: dict[str, float] = {
@@ -46,39 +31,18 @@ _EXC_DISCOUNTS: dict[str, float] = {
 
 def request_fix(func: Any, exc: BaseException, prompt: str) -> AIResponse | None:
     cfg = _config.get()
-    client = anthropic.Anthropic()
+    agent: Agent[None, AIResponse] = Agent(
+        model=cfg.model,
+        result_type=AIResponse,
+    )
 
-    for attempt in range(3):
-        try:
-            response = client.messages.create(
-                model=cfg.model,
-                max_tokens=2048,
-                tools=[{
-                    "name": "submit_fix",
-                    "description": "Submit the fixed function source and metadata",
-                    "input_schema": _RESPONSE_SCHEMA,
-                }],
-                tool_choice={"type": "tool", "name": "submit_fix"},
-                messages=[{"role": "user", "content": prompt}],
-            )
-
-            for block in response.content:
-                if block.type == "tool_use" and block.name == "submit_fix":
-                    resp = AIResponse(**block.input)
-                    resp.confidence = _apply_discounts(resp, func, exc)
-                    return resp
-
-            return None
-
-        except anthropic.RateLimitError:
-            if attempt < 2:
-                time.sleep(2 ** attempt)
-            else:
-                return None
-        except anthropic.APIError:
-            return None
-
-    return None
+    try:
+        result = agent.run_sync(prompt)
+        resp = result.data
+        resp.confidence = _apply_discounts(resp, func, exc)
+        return resp
+    except Exception:
+        return None
 
 
 def _apply_discounts(resp: AIResponse, func: Any, exc: BaseException) -> float:

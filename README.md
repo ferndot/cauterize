@@ -6,6 +6,8 @@
 
 ```bash
 pip install cauterize
+pip install "pydantic-ai[anthropic]"   # for Claude (default)
+pip install "pydantic-ai[openai]"      # for OpenAI
 
 # With framework extras:
 pip install "cauterize[fastapi]"
@@ -13,7 +15,7 @@ pip install "cauterize[django]"
 pip install "cauterize[celery]"
 ```
 
-Requires `ANTHROPIC_API_KEY` in the environment.
+Requires the appropriate API key in the environment (`ANTHROPIC_API_KEY` for Claude, `OPENAI_API_KEY` for OpenAI).
 
 ---
 
@@ -73,7 +75,7 @@ def risky_calculation(x: int) -> int:
 1. **Intercept** — `@cauterize.heal` wraps the function in a try/except retry loop (sync and async).
 2. **Check eligibility** — builtins, C extensions, magic methods, protected functions, and `cauterize.*` itself are never patched.
 3. **Rate-limit** — each `(function, exc_type)` pair gets at most `max_retries` attempts per hour.
-4. **Ask Claude** — the function source, traceback, and local variable types (not values) are sent with a structured tool-use prompt. Claude returns `fixed_source`, `explanation`, `confidence`, and `is_safe_to_auto_apply`.
+4. **Ask the model** — the function source, traceback, and local variable types (not values) are sent with a structured prompt. The model returns `fixed_source`, `explanation`, `confidence`, and `is_safe_to_auto_apply`.
 5. **Validate** — the patch is AST-checked: must compile, signature unchanged, no new imports, no dangerous builtins, line count ≤ 3× original.
 6. **Replay** — the fixed function is executed with the original arguments. If it raises, the patch is discarded.
 7. **Commit** — `setattr(module, func_name, new_func)` hot-patches the live module. The fix is cached — subsequent calls skip the LLM entirely.
@@ -85,7 +87,8 @@ def risky_calculation(x: int) -> int:
 
 ```python
 cauterize.configure(
-    model="claude-opus-4-6",        # Claude model for patch generation
+    model="anthropic:claude-opus-4-6",   # default — Claude via Anthropic
+    # model="openai:gpt-4o",            # or any pydantic-ai model string
     confidence_threshold=0.85,      # minimum confidence to apply a patch (0–1)
     max_retries=3,                  # max heal attempts per function/exc_type per hour
     dry_run=False,                  # if True: generate and log patches but don't apply
