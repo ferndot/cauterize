@@ -50,6 +50,7 @@ class JiraCard:
             "issuetype":   {"name": self.issue_type},
             "summary":     f"cauterize: {ctx.exc_type} in {ctx.func_qualname}",
             "description": _card_description(ctx),
+            "assignee":    None,
         }
         fields.update(self.extra_fields)
         try:
