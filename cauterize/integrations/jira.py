@@ -106,29 +106,47 @@ class JiraCard:
 
 def _card_description(ctx: HealContext) -> dict:
     """Build an Atlassian Document Format description for the Jira issue."""
-    def text_node(content: str) -> dict:
-        return {"type": "text", "text": content}
 
-    def paragraph(*texts) -> dict:
-        return {"type": "paragraph", "content": [text_node(t) for t in texts]}
+    def _t(text: str, **marks) -> dict:
+        node: dict = {"type": "text", "text": text}
+        if marks:
+            node["marks"] = [{"type": k} for k in marks]
+        return node
 
-    def code_block(code: str) -> dict:
-        return {
-            "type": "codeBlock",
-            "attrs": {"language": "python"},
-            "content": [{"type": "text", "text": code}],
-        }
+    def _p(*children) -> dict:
+        return {"type": "paragraph", "content": list(children)}
+
+    def _heading(text: str, level: int = 3) -> dict:
+        return {"type": "heading", "attrs": {"level": level}, "content": [_t(text)]}
+
+    def _code(text: str, lang: str = "python") -> dict:
+        return {"type": "codeBlock", "attrs": {"language": lang}, "content": [_t(text)]}
+
+    def _rule() -> dict:
+        return {"type": "rule"}
+
+    def _panel(content: list, panel_type: str = "info") -> dict:
+        return {"type": "panel", "attrs": {"panelType": panel_type}, "content": content}
 
     return {
         "type": "doc",
         "version": 1,
         "content": [
-            paragraph(f"cauterize auto-healed this at {ctx.timestamp}. Fix is live in process."),
-            paragraph(f"Function: {ctx.func_qualname}"),
-            paragraph(f"Exception: {ctx.exc_type}: {ctx.exc_message}"),
-            paragraph(f"Confidence: {ctx.confidence:.0%}"),
-            paragraph(f"Explanation: {ctx.explanation}"),
-            paragraph("Fix:"),
-            code_block(ctx.fixed_source),
+            _panel([
+                _p(_t("cauterize ", strong=True), _t(f"auto-healed this function at {ctx.timestamp}. The fix is live in-process — this card tracks the code change for review.")),
+            ], "info"),
+
+            _heading("Exception"),
+            _p(_t(f"{ctx.exc_type}: ", strong=True), _t(ctx.exc_message)),
+            _p(_t("Function: ", strong=True), _t(ctx.func_qualname, code=True)),
+            _p(_t("Confidence: ", strong=True), _t(f"{ctx.confidence:.0%}")),
+
+            _rule(),
+
+            _heading("Explanation"),
+            _p(_t(ctx.explanation)),
+
+            _heading("Patch"),
+            _code(ctx.fixed_source),
         ],
     }

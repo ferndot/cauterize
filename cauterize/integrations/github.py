@@ -54,6 +54,41 @@ class GitHubPR:
         func_slug = ctx.func_qualname.split(".")[-1].replace("_", "-")
         return f"cauterize/heal-{func_slug}"
 
+    def _fetch_pr_template(self) -> str | None:
+        """Fetch .github/pull_request_template.md from the repo if it exists."""
+        for path in (".github/pull_request_template.md", "pull_request_template.md"):
+            resp = self._session.get(
+                f"{_API}/repos/{self.repo}/contents/{path}",
+                params={"ref": self.base_branch},
+            )
+            if resp.status_code == 200:
+                return base64.b64decode(resp.json()["content"]).decode("utf-8")
+        return None
+
+    def _build_pr_body(self, ctx: HealContext) -> str:
+        """Build PR body from template if available, else use a default."""
+        template = self._fetch_pr_template()
+        if template:
+            return template.format(
+                func_qualname=ctx.func_qualname,
+                exc_type=ctx.exc_type,
+                exc_message=ctx.exc_message,
+                confidence=f"{ctx.confidence:.0%}",
+                explanation=ctx.explanation,
+                fixed_source=ctx.fixed_source,
+                original_source=ctx.original_source or "",
+                source_file=ctx.source_file or "",
+            )
+        return (
+            f"## Automated fix by [cauterize](https://github.com/ferndot/cauterize)\n\n"
+            f"**Function:** `{ctx.func_qualname}`\n"
+            f"**Exception:** `{ctx.exc_type}: {ctx.exc_message}`\n"
+            f"**Confidence:** {ctx.confidence:.0%}\n\n"
+            f"**Explanation:** {ctx.explanation}\n\n"
+            f"---\n"
+            f"*This PR was opened automatically when cauterize healed a runtime exception.*"
+        )
+
     def _find_existing_pr(self, ctx: HealContext) -> str | None:
         """Find an open PR whose head branch matches the dedup prefix."""
         prefix = self._branch_prefix(ctx)
@@ -144,18 +179,11 @@ class GitHubPR:
             log.warning("cauterize.github: could not commit fix — %s %s", update_resp.status_code, update_resp.text[:200])
             return None
 
-        # Open PR
+        # Open PR — use repo template if available, else default body
+        body = self._build_pr_body(ctx)
         pr_resp = self._session.post(f"{_API}/repos/{self.repo}/pulls", json={
             "title": f"fix: cauterize healed {ctx.func_qualname}",
-            "body": (
-                f"## Automated fix by [cauterize](https://github.com/ferndot/cauterize)\n\n"
-                f"**Function:** `{ctx.func_qualname}`\n"
-                f"**Exception:** `{ctx.exc_type}: {ctx.exc_message}`\n"
-                f"**Confidence:** {ctx.confidence:.0%}\n\n"
-                f"**Explanation:** {ctx.explanation}\n\n"
-                f"---\n"
-                f"*This PR was opened automatically when cauterize healed a runtime exception.*"
-            ),
+            "body": body,
             "head": branch_name,
             "base": self.base_branch,
             "draft": True,
