@@ -73,28 +73,11 @@ class GitHubPR:
         return None
 
     def _build_pr_body(self, ctx: HealContext) -> str:
-        """Build PR body from template if available, else use a default."""
+        """Build PR body, filling in a repo template if one exists."""
         template = self._fetch_pr_template()
         if template:
-            return template.format(
-                func_qualname=ctx.func_qualname,
-                exc_type=ctx.exc_type,
-                exc_message=ctx.exc_message,
-                confidence=f"{ctx.confidence:.0%}",
-                explanation=ctx.explanation,
-                fixed_source=ctx.fixed_source,
-                original_source=ctx.original_source or "",
-                source_file=ctx.source_file or "",
-            )
-        return (
-            f"## Automated fix by [cauterize](https://github.com/ferndot/cauterize)\n\n"
-            f"**Function:** `{ctx.func_qualname}`\n"
-            f"**Exception:** `{ctx.exc_type}: {ctx.exc_message}`\n"
-            f"**Confidence:** {ctx.confidence:.0%}\n\n"
-            f"**Explanation:** {ctx.explanation}\n\n"
-            f"---\n"
-            f"*This PR was opened automatically when cauterize healed a runtime exception.*"
-        )
+            return _fill_template(template, ctx)
+        return _default_body(ctx)
 
     def _find_existing_pr(self, ctx: HealContext) -> str | None:
         """Find an open PR whose head branch matches the dedup prefix."""
@@ -214,6 +197,90 @@ class GitHubPR:
             )
 
         return pr_url
+
+
+def _default_body(ctx: HealContext) -> str:
+    return (
+        f"## Automated fix by [cauterize](https://github.com/ferndot/cauterize)\n\n"
+        f"**Function:** `{ctx.func_qualname}`\n"
+        f"**Exception:** `{ctx.exc_type}: {ctx.exc_message}`\n"
+        f"**Confidence:** {ctx.confidence:.0%}\n\n"
+        f"**Explanation:** {ctx.explanation}\n\n"
+        f"### Original\n\n```python\n{ctx.original_source or '(unavailable)'}\n```\n\n"
+        f"### Patched\n\n```python\n{ctx.fixed_source}\n```\n\n"
+        f"---\n"
+        f"*This PR was opened automatically when cauterize healed a runtime exception.*"
+    )
+
+
+import re as _re
+
+def _fill_template(template: str, ctx: HealContext) -> str:
+    """Fill a generic PR template by replacing section placeholders with content.
+
+    Works with any markdown template — looks for common section headings
+    (Summary, Description, Type, Testing, Context, etc.) and fills in
+    the HTML comment placeholders beneath them with cauterize content.
+    """
+    summary = (
+        f"**cauterize** auto-healed `{ctx.func_qualname}` after intercepting "
+        f"`{ctx.exc_type}: {ctx.exc_message}` ({ctx.confidence:.0%} confidence).\n\n"
+        f"{ctx.explanation}"
+    )
+
+    type_section = "- [x] Bug fix"
+
+    testing = (
+        f"Cauterize validated this patch by replaying the original call against the "
+        f"patched function before applying it. Confidence: {ctx.confidence:.0%}."
+    )
+
+    context = (
+        f"| Field | Value |\n"
+        f"|:---|:---|\n"
+        f"| **Function** | `{ctx.func_qualname}` |\n"
+        f"| **File** | `{ctx.source_file or '(unknown)'}` |\n"
+        f"| **Exception** | `{ctx.exc_type}: {ctx.exc_message}` |\n"
+        f"| **Confidence** | {ctx.confidence:.0%} |\n\n"
+        f"### Original\n\n```python\n{ctx.original_source or '(unavailable)'}\n```\n\n"
+        f"### Patched\n\n```python\n{ctx.fixed_source}\n```"
+    )
+
+    # Map section heading keywords -> content to inject
+    fills = {
+        "summary": summary,
+        "description": summary,
+        "what": summary,
+        "type": type_section,
+        "testing": testing,
+        "test plan": testing,
+        "how": testing,
+        "context": context,
+        "additional": context,
+        "details": context,
+        "notes": context,
+    }
+
+    def _replace_section(match: _re.Match) -> str:
+        heading = match.group(1)
+        comment = match.group(2)
+        heading_lower = heading.lower().strip()
+        for keyword, content in fills.items():
+            if keyword in heading_lower:
+                return f"{match.group(0).split(chr(10))[0]}\n\n{content}"
+        return match.group(0)
+
+    # Match: ## Heading\n\n<!-- comment -->
+    filled = _re.sub(
+        r"(#+\s+[^\n]+)\s*\n\s*(<!--[^>]*-->)",
+        _replace_section,
+        template,
+    )
+
+    # Also check unchecked boxes after "Type" heading and check "Bug fix"
+    filled = _re.sub(r"- \[ \] Bug fix", "- [x] Bug fix", filled)
+
+    return filled
 
 
 def _repo_relative_path(repo: str, absolute_path: str) -> str | None:
