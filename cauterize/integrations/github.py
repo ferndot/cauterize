@@ -55,11 +55,11 @@ class GitHubPR:
             return None
 
         # Get base branch SHA
-        ref_resp = self._session.get(f"{_API}/repos/{self.repo}/git/refs/heads/{self.base_branch}")
+        ref_resp = self._session.get(f"{_API}/repos/{self.repo}/branches/{self.base_branch}")
         if ref_resp.status_code != 200:
-            log.warning("cauterize.github: could not get base branch — %s", ref_resp.status_code)
+            log.warning("cauterize.github: could not get base branch — %s %s", ref_resp.status_code, ref_resp.text[:200])
             return None
-        base_sha = ref_resp.json()["object"]["sha"]
+        base_sha = ref_resp.json()["commit"]["sha"]
 
         # Create heal branch
         func_slug = ctx.func_qualname.split(".")[-1].replace("_", "-")
@@ -71,7 +71,7 @@ class GitHubPR:
             "sha": base_sha,
         })
         if branch_resp.status_code not in (200, 201):
-            log.warning("cauterize.github: could not create branch — %s", branch_resp.status_code)
+            log.warning("cauterize.github: could not create branch — %s %s", branch_resp.status_code, branch_resp.text[:200])
             return None
 
         # Get file content and SHA (needed for update)
@@ -88,7 +88,7 @@ class GitHubPR:
             params={"ref": self.base_branch},
         )
         if file_resp.status_code != 200:
-            log.warning("cauterize.github: could not get file contents — %s", file_resp.status_code)
+            log.warning("cauterize.github: could not get file contents — %s %s", file_resp.status_code, file_resp.text[:200])
             return None
 
         file_data = file_resp.json()
