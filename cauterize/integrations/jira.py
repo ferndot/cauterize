@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any
 
 import requests
 
@@ -18,6 +18,22 @@ class JiraCard:
     project: str
     email: str = ""          # Atlassian Cloud: email + token -> Basic auth
     issue_type: str = "Task"
+    extra_fields: dict[str, Any] = field(default_factory=dict)
+    """Extra fields merged into the Jira issue payload.
+
+    Use this for project-required custom fields, e.g.::
+
+        JiraCard(
+            url="https://myorg.atlassian.net",
+            token="...",
+            project="GSE",
+            email="me@example.com",
+            extra_fields={
+                "components": [{"name": "Platform"}],
+                "customfield_17684": {"value": "My Team"},
+            },
+        )
+    """
 
     def create(self, ctx: HealContext) -> str | None:
         """Create a Jira card. Returns the card URL, or None on failure."""
@@ -26,19 +42,19 @@ class JiraCard:
         headers: dict[str, str] = {"Content-Type": "application/json"}
         if not self.email:
             headers["Authorization"] = f"Bearer {self.token}"
+        fields: dict[str, Any] = {
+            "project":     {"key": self.project},
+            "issuetype":   {"name": self.issue_type},
+            "summary":     f"cauterize: {ctx.exc_type} in {ctx.func_qualname}",
+            "description": _card_description(ctx),
+        }
+        fields.update(self.extra_fields)
         try:
             resp = requests.post(
                 f"{self.url}/rest/api/3/issue",
                 headers=headers,
                 auth=auth,
-                json={
-                    "fields": {
-                        "project":   {"key": self.project},
-                        "issuetype": {"name": self.issue_type},
-                        "summary":   f"cauterize: {ctx.exc_type} in {ctx.func_qualname}",
-                        "description": _card_description(ctx),
-                    }
-                },
+                json={"fields": fields},
                 timeout=10,
             )
             resp.raise_for_status()
