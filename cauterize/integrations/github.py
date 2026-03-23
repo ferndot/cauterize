@@ -206,8 +206,6 @@ def _default_body(ctx: HealContext) -> str:
         f"**Exception:** `{ctx.exc_type}: {ctx.exc_message}`\n"
         f"**Confidence:** {ctx.confidence:.0%}\n\n"
         f"**Explanation:** {ctx.explanation}\n\n"
-        f"### Original\n\n```python\n{ctx.original_source or '(unavailable)'}\n```\n\n"
-        f"### Patched\n\n```python\n{ctx.fixed_source}\n```\n\n"
         f"---\n"
         f"*This PR was opened automatically when cauterize healed a runtime exception.*"
     )
@@ -241,9 +239,7 @@ def _fill_template(template: str, ctx: HealContext) -> str:
         f"| **Function** | `{ctx.func_qualname}` |\n"
         f"| **File** | `{ctx.source_file or '(unknown)'}` |\n"
         f"| **Exception** | `{ctx.exc_type}: {ctx.exc_message}` |\n"
-        f"| **Confidence** | {ctx.confidence:.0%} |\n\n"
-        f"### Original\n\n```python\n{ctx.original_source or '(unavailable)'}\n```\n\n"
-        f"### Patched\n\n```python\n{ctx.fixed_source}\n```"
+        f"| **Confidence** | {ctx.confidence:.0%} |"
     )
 
     # Map section heading keywords -> content to inject
