@@ -130,6 +130,7 @@ class GitHubPR:
             ),
             "head": branch_name,
             "base": self.base_branch,
+            "draft": True,
         })
         if pr_resp.status_code not in (200, 201):
             log.warning("cauterize.github: could not create PR — %s %s", pr_resp.status_code, pr_resp.text[:200])
