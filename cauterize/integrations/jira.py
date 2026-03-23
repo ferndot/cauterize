@@ -38,19 +38,53 @@ class JiraCard:
         )
     """
 
-    def create(self, ctx: HealContext) -> str | None:
-        """Create a Jira card. Returns the card URL, or None on failure."""
-        # Atlassian Cloud uses Basic auth (email:api_token); self-hosted uses Bearer.
+    def _auth(self) -> tuple[tuple[str, str] | None, dict[str, str]]:
         auth = (self.email, self.token) if self.email else None
         headers: dict[str, str] = {"Content-Type": "application/json"}
         if not self.email:
             headers["Authorization"] = f"Bearer {self.token}"
+        return auth, headers
+
+    @staticmethod
+    def _dedup_label(ctx: HealContext) -> str:
+        """Deterministic label used as an exact-match dedup key."""
+        return f"cauterize:{ctx.func_qualname}:{ctx.exc_type}"
+
+    def _find_existing(self, ctx: HealContext) -> str | None:
+        """Find an open issue with the dedup label. Returns URL or None."""
+        auth, headers = self._auth()
+        label = self._dedup_label(ctx)
+        jql = f'project = {self.project} AND labels = "{label}" AND status != Done'
+        try:
+            resp = requests.get(
+                f"{self.url}/rest/api/3/search",
+                headers=headers,
+                auth=auth,
+                params={"jql": jql, "fields": "key", "maxResults": 1},
+                timeout=10,
+            )
+            if resp.ok and resp.json().get("total", 0) > 0:
+                key = resp.json()["issues"][0]["key"]
+                log.info("cauterize.jira: reusing existing card %s", key)
+                return f"{self.url}/browse/{key}"
+        except Exception as e:
+            log.warning("cauterize.jira: dedup search failed — %s", e)
+        return None
+
+    def create(self, ctx: HealContext) -> str | None:
+        """Create a Jira card, or return the existing one if already created."""
+        existing = self._find_existing(ctx)
+        if existing:
+            return existing
+
+        auth, headers = self._auth()
         fields: dict[str, Any] = {
             "project":     {"key": self.project},
             "issuetype":   {"name": self.issue_type},
             "summary":     f"cauterize: {ctx.exc_type} in {ctx.func_qualname}",
             "description": _card_description(ctx),
             "assignee":    None,
+            "labels":      [self._dedup_label(ctx)],
         }
         fields.update(self.extra_fields)
         try:

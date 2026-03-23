@@ -49,10 +49,34 @@ class GitHubPR:
             log.warning("cauterize.github: PR creation failed — %s", e)
             return None
 
+    @staticmethod
+    def _branch_prefix(ctx: HealContext) -> str:
+        func_slug = ctx.func_qualname.split(".")[-1].replace("_", "-")
+        return f"cauterize/heal-{func_slug}"
+
+    def _find_existing_pr(self, ctx: HealContext) -> str | None:
+        """Find an open PR whose head branch matches the dedup prefix."""
+        prefix = self._branch_prefix(ctx)
+        owner = self.repo.split("/")[0]
+        resp = self._session.get(f"{_API}/repos/{self.repo}/pulls", params={
+            "state": "open",
+            "head": f"{owner}:{prefix}",
+            "per_page": 1,
+        })
+        if resp.ok and resp.json():
+            pr_url = resp.json()[0].get("html_url")
+            log.info("cauterize.github: reusing existing PR — %s", pr_url)
+            return pr_url
+        return None
+
     def _create(self, ctx: HealContext) -> str | None:
         if not ctx.source_file or not ctx.original_source or not ctx.fixed_source:
             log.warning("cauterize.github: missing source context, cannot create PR")
             return None
+
+        existing = self._find_existing_pr(ctx)
+        if existing:
+            return existing
 
         # Get base branch SHA
         ref_resp = self._session.get(f"{_API}/repos/{self.repo}/branches/{self.base_branch}")
@@ -61,10 +85,14 @@ class GitHubPR:
             return None
         base_sha = ref_resp.json()["commit"]["sha"]
 
-        # Create heal branch
-        func_slug = ctx.func_qualname.split(".")[-1].replace("_", "-")
-        ts = int(time.time())
-        branch_name = f"cauterize/heal-{func_slug}-{ts}"
+        # Create heal branch — deterministic name (no timestamp) for dedup
+        branch_name = self._branch_prefix(ctx)
+
+        # Check if branch already exists (stale from a previous run)
+        existing_ref = self._session.get(f"{_API}/repos/{self.repo}/git/refs/heads/{branch_name}")
+        if existing_ref.status_code == 200:
+            # Delete stale branch so we can recreate with fresh base
+            self._session.delete(f"{_API}/repos/{self.repo}/git/refs/heads/{branch_name}")
 
         branch_resp = self._session.post(f"{_API}/repos/{self.repo}/git/refs", json={
             "ref": f"refs/heads/{branch_name}",
