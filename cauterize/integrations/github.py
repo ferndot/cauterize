@@ -30,10 +30,17 @@ _API = "https://api.github.com"
 
 
 class GitHubPR:
-    def __init__(self, token: str, repo: str, base_branch: str = "main") -> None:
+    def __init__(
+        self,
+        token: str,
+        repo: str,
+        base_branch: str = "main",
+        labels: list[str] | None = None,
+    ) -> None:
         self.token = token
         self.repo = repo          # "owner/repo"
         self.base_branch = base_branch
+        self.labels = labels or ["cauterize"]
         self._session = requests.Session()
         self._session.headers.update({
             "Authorization": f"Bearer {token}",
@@ -41,10 +48,10 @@ class GitHubPR:
             "X-GitHub-Api-Version": "2022-11-28",
         })
 
-    def create(self, ctx: HealContext) -> str | None:
+    def create(self, ctx: HealContext, *, jira_url: str | None = None) -> str | None:
         """Open a PR with the healed source. Returns PR URL or None on failure."""
         try:
-            return self._create(ctx)
+            return self._create(ctx, jira_url=jira_url)
         except Exception as e:
             log.warning("cauterize.github: PR creation failed — %s", e)
             return None
@@ -104,7 +111,7 @@ class GitHubPR:
             return pr_url
         return None
 
-    def _create(self, ctx: HealContext) -> str | None:
+    def _create(self, ctx: HealContext, *, jira_url: str | None = None) -> str | None:
         if not ctx.source_file or not ctx.original_source or not ctx.fixed_source:
             log.warning("cauterize.github: missing source context, cannot create PR")
             return None
@@ -181,6 +188,8 @@ class GitHubPR:
 
         # Open PR — use repo template if available, else default body
         body = self._build_pr_body(ctx)
+        if jira_url:
+            body += f"\n\n---\n**Jira:** {jira_url}"
         pr_resp = self._session.post(f"{_API}/repos/{self.repo}/pulls", json={
             "title": f"fix: cauterize healed {ctx.func_qualname}",
             "body": body,
@@ -192,8 +201,18 @@ class GitHubPR:
             log.warning("cauterize.github: could not create PR — %s %s", pr_resp.status_code, pr_resp.text[:200])
             return None
 
-        pr_url = pr_resp.json().get("html_url")
+        pr_data = pr_resp.json()
+        pr_url = pr_data.get("html_url")
+        pr_number = pr_data.get("number")
         log.info("cauterize.github: PR opened — %s", pr_url)
+
+        # Apply labels
+        if self.labels and pr_number:
+            self._session.post(
+                f"{_API}/repos/{self.repo}/issues/{pr_number}/labels",
+                json={"labels": self.labels},
+            )
+
         return pr_url
 
 

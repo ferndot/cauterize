@@ -139,12 +139,16 @@ def _card_description(ctx: HealContext) -> dict:
             _heading("Exception"),
             _p(_t(f"{ctx.exc_type}: ", strong=True), _t(ctx.exc_message)),
             _p(_t("Function: ", strong=True), _t(ctx.func_qualname, code=True)),
+            _p(_t("File: ", strong=True), _t(ctx.source_file or "(unknown)", code=True)),
             _p(_t("Confidence: ", strong=True), _t(f"{ctx.confidence:.0%}")),
 
             _rule(),
 
             _heading("Explanation"),
             _p(_t(ctx.explanation)),
+
+            _heading("Original"),
+            _code(ctx.original_source or "(source unavailable)"),
 
             _heading("Patch"),
             _code(ctx.fixed_source),
