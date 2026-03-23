@@ -6,7 +6,7 @@ from ._context import ExceptionContext, get_source
 def build(ctx: ExceptionContext, func) -> str:
     source = get_source(func)
     return f"""\
-You are fixing a Python runtime error. Return ONLY a JSON object matching the schema below.
+You are fixing a Python runtime error. Use the submit_fix tool to return your answer.
 
 ## Function to fix
 
@@ -35,15 +35,7 @@ You are fixing a Python runtime error. Return ONLY a JSON object matching the sc
 - Keep the fix minimal — change as few lines as possible
 - Return the complete, syntactically valid function definition
 
-## Required JSON schema
-
-{{
-  "fixed_source": "<complete fixed function>",
-  "confidence": <float 0.0–1.0>,
-  "explanation": "<one sentence>",
-  "is_safe_to_auto_apply": <bool>,
-  "safety_concerns": "<empty string or description>"
-}}"""
+"""
 
 
 def _format_traceback(ctx: ExceptionContext) -> str:
