@@ -306,7 +306,7 @@ def _post_heal_dispatch(heal_ctx: HealContext) -> None:
 
     if cfg.github:
         try:
-            pr_url = cfg.github.create(heal_ctx)
+            pr_url = cfg.github.create(heal_ctx, jira_url=card_url)
             if pr_url:
                 results["github_pr_url"] = pr_url
         except Exception:
