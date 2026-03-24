@@ -84,7 +84,6 @@ class JiraCard:
             "issuetype":   {"name": self.issue_type},
             "summary":     f"cauterize: {ctx.exc_type} in {ctx.func_qualname}",
             "description": _card_description(ctx),
-            "assignee":    None,
             "labels":      [self._dedup_label(ctx)],
         }
         fields.update(self.extra_fields)
