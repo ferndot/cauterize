@@ -162,6 +162,10 @@ def _attempt_heal_sync(current_func, exc, args, kwargs, attempt, cfg, _healed):
     _dispatch_notifications(ctx, ai_resp)
     new_func.__cauterize_original_source__ = original_source
     new_func.__cauterize_patched_source__ = ai_resp.fixed_source
+    new_func.__cauterize_explanation__ = ai_resp.explanation
+    new_func.__cauterize_confidence_score__ = ai_resp.confidence_score
+    new_func.__cauterize_risk_score__ = ai_resp.risk_score
+    new_func.__cauterize_complexity_score__ = ai_resp.complexity_score
     _healed[0] = new_func
 
     return result, new_func
@@ -247,6 +251,10 @@ async def _run_async(func: Any, args: tuple, kwargs: dict, _healed: list) -> Any
             _dispatch_notifications(ctx, ai_resp)
             new_func.__cauterize_original_source__ = original_source
             new_func.__cauterize_patched_source__ = ai_resp.fixed_source
+            new_func.__cauterize_explanation__ = ai_resp.explanation
+            new_func.__cauterize_confidence_score__ = ai_resp.confidence_score
+            new_func.__cauterize_risk_score__ = ai_resp.risk_score
+            new_func.__cauterize_complexity_score__ = ai_resp.complexity_score
             _healed[0] = new_func
             current_func = new_func
 
@@ -276,6 +284,9 @@ def _dispatch_notifications(ctx: _context.ExceptionContext, ai_resp: Any) -> Non
         confidence=ai_resp.confidence,
         source_file=source_file,
         original_source=_context.get_source(ctx.target_func),
+        confidence_score=ai_resp.confidence_score,
+        risk_score=ai_resp.risk_score,
+        complexity_score=ai_resp.complexity_score,
     )
     threading.Thread(
         target=_post_heal_dispatch,
