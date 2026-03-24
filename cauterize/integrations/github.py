@@ -202,12 +202,15 @@ class GitHubPR:
 def _default_body(ctx: HealContext) -> str:
     return (
         f"## Automated fix by [cauterize](https://github.com/ferndot/cauterize)\n\n"
-        f"**Function:** `{ctx.func_qualname}`\n"
-        f"**Exception:** `{ctx.exc_type}: {ctx.exc_message}`\n"
-        f"**Confidence:** {ctx.confidence:.0%}\n\n"
-        f"**Explanation:** {ctx.explanation}\n\n"
+        f"{ctx.explanation}\n\n"
+        f"| Field | Value |\n"
+        f"|:---|:---|\n"
+        f"| **Function** | `{ctx.func_qualname}` |\n"
+        f"| **File** | `{ctx.source_file or '(unknown)'}` |\n"
+        f"| **Exception** | `{ctx.exc_type}: {ctx.exc_message}` |\n"
+        f"| **Confidence** | {ctx.confidence:.0%} |\n\n"
         f"---\n"
-        f"*This PR was opened automatically when cauterize healed a runtime exception.*"
+        f"*This PR was opened automatically by cauterize when it healed a runtime exception.*"
     )
 
 
@@ -242,6 +245,10 @@ def _fill_template(template: str, ctx: HealContext) -> str:
         f"| **Confidence** | {ctx.confidence:.0%} |"
     )
 
+    changes_section = (
+        f"The diff is visible in the **Files changed** tab of this PR."
+    )
+
     # Map section heading keywords -> content to inject
     fills = {
         "summary": summary,
@@ -255,15 +262,15 @@ def _fill_template(template: str, ctx: HealContext) -> str:
         "additional": context,
         "details": context,
         "notes": context,
+        "changes": changes_section,
     }
 
     def _replace_section(match: _re.Match) -> str:
-        heading = match.group(1)
-        comment = match.group(2)
-        heading_lower = heading.lower().strip()
+        heading_line = match.group(1).strip()
+        heading_lower = heading_line.lower()
         for keyword, content in fills.items():
             if keyword in heading_lower:
-                return f"{match.group(0).split(chr(10))[0]}\n\n{content}"
+                return f"{heading_line}\n\n{content}"
         return match.group(0)
 
     # Match: ## Heading\n\n<!-- comment -->
