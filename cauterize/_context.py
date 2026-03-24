@@ -37,6 +37,10 @@ class HealContext:
     confidence: float
     source_file: str = ""         # absolute path to the source file
     original_source: str = ""     # the original (broken) function source
+    # 1-5 triage scores (1=best/lowest for confidence, 1=lowest impact for risk/complexity)
+    confidence_score: int = 0     # 1=High … 5=Very Low
+    risk_score: int = 0           # 1=XS … 5=XL
+    complexity_score: int = 0     # 1=XS … 5=XL
     timestamp: str = field(
         default_factory=lambda: time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     )
