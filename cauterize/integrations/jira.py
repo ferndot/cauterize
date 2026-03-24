@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import difflib
 import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
@@ -147,10 +148,24 @@ def _card_description(ctx: HealContext) -> dict:
             _heading("Explanation"),
             _p(_t(ctx.explanation)),
 
-            _heading("Original"),
-            _code(ctx.original_source or "(source unavailable)"),
-
-            _heading("Patch"),
-            _code(ctx.fixed_source),
+            _heading("Changes"),
+            _code(_unified_diff(ctx.original_source, ctx.fixed_source, ctx.func_qualname), lang="diff"),
         ],
     }
+
+
+def _unified_diff(original: str | None, patched: str, func_qualname: str) -> str:
+    """Generate a unified diff between original and patched source."""
+    if not original:
+        return patched
+    orig_lines = original.splitlines(keepends=True)
+    patch_lines = patched.splitlines(keepends=True)
+    diff = difflib.unified_diff(
+        orig_lines,
+        patch_lines,
+        fromfile=f"a/{func_qualname}",
+        tofile=f"b/{func_qualname}",
+        lineterm="",
+    )
+    result = "".join(diff)
+    return result or "(no differences)"

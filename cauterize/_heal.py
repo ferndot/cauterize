@@ -297,18 +297,19 @@ def _post_heal_dispatch(heal_ctx: HealContext) -> None:
         except Exception:
             pass
 
-    if cfg.slack:
-        try:
-            cfg.slack.send(heal_ctx, card_url)
-            results["slack_sent"] = True
-        except Exception:
-            pass
-
+    pr_url = None
     if cfg.github:
         try:
             pr_url = cfg.github.create(heal_ctx, jira_url=card_url)
             if pr_url:
                 results["github_pr_url"] = pr_url
+        except Exception:
+            pass
+
+    if cfg.slack:
+        try:
+            cfg.slack.send(heal_ctx, card_url, github_pr_url=pr_url)
+            results["slack_sent"] = True
         except Exception:
             pass
 
